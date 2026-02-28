@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Conversation Viewer</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <!-- Marked.js for markdown parsing (local) -->
+    <script src="/libs/marked.min.js"></script>
+    <!-- Highlight.js for code syntax highlighting (local) -->
+    <link rel="stylesheet" href="/libs/github-dark.min.css">
+    <script src="/libs/highlight.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --border-color: #e0e0e0;
+            --border-hover: #d0d0d0;
+            --text-primary: #1a1a1a;
+            --text-secondary: #2a2a2a;
+            --text-muted: #666;
+            --text-muted-dark: #888;
+            --accent-color: #d97706;
+            --accent-hover: #ea580c;
+
+            /* Role colors */
+            --user-color: #3498db;
+            --assistant-color: #2ecc71;
+            --tool-use-color: #f39c12;
+            --tool-use-bg: #fffbf0;
+            --tool-result-color: #e74c3c;
+            --tool-result-bg: #fff5f5;
+
+            /* Code block colors */
+            --code-bg: #f6f8fa;
+            --code-border: #e1e4e8;
+            --code-header-bg: #f1f3f5;
+            --inline-code-bg: #f3f4f6;
+            --inline-code-color: #e83e8c;
+        }
+
+        /* Dark theme */
+        body.theme-dark {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #1c2128;
+            --border-color: #30363d;
+            --border-hover: #484f58;
+            --text-primary: #e6edf3;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --text-muted-dark: #6e7681;
+            --tool-use-bg: #1a1f00;
+            --tool-result-bg: #1a0a00;
+
+            --code-bg: #0d1117;
+            --code-border: #30363d;
+            --code-header-bg: #161b22;
+            --inline-code-bg: #1f2428;
+            --inline-code-color: #ff7b72;
+        }
+
+        /* Blue theme */
+        body.theme-blue {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+            --border-hover: #475569;
+            --text-primary: #f1f5f9;
+            --text-secondary: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-muted-dark: #64748b;
+            --accent-color: #3b82f6;
+            --tool-use-bg: #3a2a00;
+            --tool-result-bg: #3a0010;
+
+            --code-bg: #0f172a;
+            --code-border: #334155;
+            --code-header-bg: #1e293b;
+            --inline-code-bg: #1e3a5f;
+            --inline-code-color: #7dd3fc;
+        }
+
+        /* Purple theme */
+        body.theme-purple {
+            --bg-primary: #1a0a2e;
+            --bg-secondary: #2d1b4e;
+            --bg-card: #2d1b4e;
+            --border-color: #4a3a6a;
+            --border-hover: #5a4a7a;
+            --text-primary: #f0e6ff;
+            --text-secondary: #e6d6ff;
+            --text-muted: #a890d4;
+            --text-muted-dark: #7860a4;
+            --accent-color: #9333ea;
+            --tool-use-bg: #3a2a00;
+            --tool-result-bg: #3a0010;
+
+            --code-bg: #1a0a2e;
+            --code-border: #4a3a6a;
+            --code-header-bg: #2d1b4e;
+            --inline-code-bg: #3d2b5e;
+            --inline-code-color: #d8b4fe;
+        }
+
+        /* Green theme */
+        body.theme-green {
+            --bg-primary: #0a1f1a;
+            --bg-secondary: #143328;
+            --bg-card: #143328;
+            --border-color: #2a5a4a;
+            --border-hover: #3a6a5a;
+            --text-primary: #e6fff4;
+            --text-secondary: #d4ffe6;
+            --text-muted: #7ad4b0;
+            --text-muted-dark: #4a9a80;
+            --accent-color: #10b981;
+            --tool-use-bg: #2a2a00;
+            --tool-result-bg: #2a0010;
+
+            --code-bg: #0a1f1a;
+            --code-border: #2a5a4a;
+            --code-header-bg: #143328;
+            --inline-code-bg: #1a4a3a;
+            --inline-code-color: #6ee7b7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .theme-selector {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .theme-selector-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .theme-options {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .theme-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .theme-btn:hover {
+            background: var(--border-hover);
+        }
+
+        .theme-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .search-box {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .project-item {
+            padding: 12px 15px;
+            margin-bottom: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .project-item:hover {
+            background: var(--bg-primary);
+        }
+
+        .project-item.active {
+            background: var(--border-color);
+        }
+
+        .project-item .project-name {
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+
+        .project-item .project-info {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Filter panel */
+        .filter-panel {
+            width: 200px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .filter-header {
+            padding: 20px 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .filter-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .filter-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .filter-group {
+            margin-bottom: 20px;
+        }
+
+        .filter-group-title {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .filter-item:hover {
+            background: var(--bg-primary);
+        }
+
+        .filter-item input[type="checkbox"] {
+            margin-right: 10px;
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .filter-item label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-secondary);
+            user-select: none;
+        }
+
+        .filter-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        .filter-actions {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: var(--border-hover);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .main-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            position: relative;
+        }
+
+        .main-header-left {
+            padding-right: 80px;
+        }
+
+        .main-header h2 {
+            font-size: 16px;
+            color: var(--text-primary);
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .main-header .meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        .main-header-actions {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+        }
+
+        .refresh-filters-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .refresh-filters-btn:hover {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .refresh-filters-btn:active {
+            transform: scale(0.98);
+        }
+
+        .refresh-filters-btn.loading {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        .refresh-icon {
+            width: 14px;
+            height: 14px;
+            transition: transform 0.3s;
+        }
+
+        .refresh-filters-btn.loading .refresh-icon {
+            animation: spin 0.8s linear infinite;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 30px;
+        }
+
+        /* Message cards - claude-extract style */
+        .message {
+            background: var(--bg-card);
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid transparent;
+        }
+
+        .message.user {
+            border-left-color: var(--user-color);
+        }
+
+        .message.assistant {
+            border-left-color: var(--assistant-color);
+        }
+
+        .message.tool_use {
+            border-left-color: var(--tool-use-color);
+            background: var(--tool-use-bg);
+        }
+
+        .message.tool_result {
+            border-left-color: var(--tool-result-color);
+            background: var(--tool-result-bg);
+        }
+
+        .message.role {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            color: var(--text-primary);
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .message-content {
+            color: var(--text-secondary);
+            font-size: 14px;
+            overflow-x: auto;
+        }
+
+        /* Markdown content styles */
+        .markdown-content {
+            word-wrap: break-word;
+        }
+
+        .markdown-content > *:first-child {
+            margin-top: 0;
+        }
+
+        .markdown-content > *:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Headings */
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+            color: var(--text-primary);
+        }
+
+        .markdown-content h1 {
+            font-size: 2em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3em;
+        }
+
+        .markdown-content h2 {
+            font-size: 1.5em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3em;
+        }
+
+        .markdown-content h3 {
+            font-size: 1.25em;
+        }
+
+        .markdown-content h4 {
+            font-size: 1em;
+        }
+
+        .markdown-content h5 {
+            font-size: 0.875em;
+        }
+
+        .markdown-content h6 {
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+
+        /* Paragraphs */
+        .markdown-content p {
+            margin-bottom: 16px;
+        }
+
+        /* Links */
+        .markdown-content a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+
+        /* Lists */
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-bottom: 16px;
+            padding-left: 2em;
+        }
+
+        .markdown-content li {
+            margin-bottom: 4px;
+        }
+
+        .markdown-content li > p {
+            margin-top: 16px;
+        }
+
+        /* Blockquotes */
+        .markdown-content blockquote {
+            margin: 16px 0;
+            padding: 0 1em;
+            color: var(--text-muted);
+            border-left: 0.25em solid var(--border-color);
+        }
+
+        .markdown-content blockquote > :first-child {
+            margin-top: 0;
+        }
+
+        .markdown-content blockquote > :last-child {
+            margin-bottom: 0;
+        }
+
+        /* Horizontal rule */
+        .markdown-content hr {
+            height: 0.25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: var(--border-color);
+            border: 0;
+        }
+
+        /* Tables */
+        .markdown-content table {
+            border-spacing: 0;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+
+        .markdown-content table th,
+        .markdown-content table td {
+            padding: 6px 13px;
+            border: 1px solid var(--border-color);
+        }
+
+        .markdown-content table th {
+            font-weight: 600;
+            background: var(--bg-primary);
+        }
+
+        .markdown-content table tr {
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .markdown-content table tr:nth-child(2n) {
+            background: var(--bg-primary);
+        }
+
+        /* Inline code */
+        .markdown-content code {
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            background: var(--inline-code-bg);
+            border-radius: 6px;
+            color: var(--inline-code-color);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        /* Code blocks */
+        .markdown-content pre {
+            padding: 16px;
+            margin: 16px 0;
+            overflow: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            background: var(--code-bg);
+            border-radius: 8px;
+            border: 1px solid var(--code-border);
+        }
+
+        .markdown-content pre code {
+            display: block;
+            padding: 0;
+            margin: 0;
+            overflow: visible;
+            line-height: inherit;
+            word-wrap: normal;
+            background: transparent;
+            color: inherit;
+            font-size: 100%;
+        }
+
+        /* Code block with language header */
+        .code-block-wrapper {
+            margin: 16px 0;
+            border-radius: 8px;
+            border: 1px solid var(--code-border);
+            overflow: hidden;
+        }
+
+        .code-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: var(--code-header-bg);
+            border-bottom: 1px solid var(--code-border);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .code-block-lang {
+            font-family: 'Consolas', 'Monaco', monospace;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .code-block-copy {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .code-block-copy:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .code-block-copy.copied {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .code-block-content {
+            background: var(--code-bg);
+            overflow-x: auto;
+        }
+
+        .code-block-content pre {
+            margin: 0;
+            padding: 16px;
+            border: none;
+            border-radius: 0;
+        }
+
+        /* Highlight.js theme adjustments */
+        .hljs {
+            background: transparent !important;
+            color: var(--text-secondary) !important;
+        }
+
+        /* Diff styles */
+        .markdown-content diff {
+            display: block;
+            margin: 16px 0;
+            padding: 16px;
+            background: var(--code-bg);
+            border-radius: 8px;
+            border: 1px solid var(--code-border);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+
+        .markdown-content diff-add {
+            display: block;
+            background: rgba(46, 160, 67, 0.15);
+            color: #3fb950;
+        }
+
+        .markdown-content diff-remove {
+            display: block;
+            background: rgba(248, 81, 73, 0.15);
+            color: #f85149;
+        }
+
+        .markdown-content diff-line {
+            display: block;
+            padding: 0 8px;
+        }
+
+        /* Tool use JSON formatting */
+        .tool-json {
+            background: var(--code-bg);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            border: 1px solid var(--code-border);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .load-more-container {
+            padding: 15px 30px;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .load-more-btn {
+            background: var(--border-color);
+            color: var(--text-muted);
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .load-more-btn:hover:not(:disabled) {
+            background: var(--accent-color);
+            color: #fff;
+        }
+
+        .page-info {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-hover);
+        }
+    </style>
+</head>
+<body class="theme-dark">
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>Claude Conversation Viewer</h1>
+            </div>
+            <div class="theme-selector">
+                <div class="theme-selector-label">Theme</div>
+                <div class="theme-options">
+                    <button class="theme-btn" data-theme="light">Light</button>
+                    <button class="theme-btn active" data-theme="dark">Dark</button>
+                    <button class="theme-btn" data-theme="blue">Blue</button>
+                    <button class="theme-btn" data-theme="purple">Purple</button>
+                    <button class="theme-btn" data-theme="green">Green</button>
+                </div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search projects...">
+            </div>
+            <div class="sidebar-content" id="projectList">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="main-area">
+                <div class="main-header" id="mainHeader" style="display: none;">
+                    <div class="main-header-left">
+                        <h2 id="projectTitle"></h2>
+                        <div class="meta" id="projectMeta"></div>
+                    </div>
+                    <div class="main-header-actions">
+                        <button class="refresh-filters-btn" id="refreshFiltersBtn" title="根据筛选条件刷新数据">
+                            <svg class="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6"></path>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"></path>
+                            </svg>
+                            刷新
+                        </button>
+                    </div>
+                </div>
+                <div class="messages-container" id="messagesContainer">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <p>Select a project to view conversation</p>
+                    </div>
+                </div>
+                <div class="load-more-container" id="loadMoreContainer" style="display: none;">
+                    <div class="page-info" id="pageInfo"></div>
+                    <button class="load-more-btn" id="loadMoreBtn">Load More</button>
+                </div>
+            </div>
+            <div class="filter-panel" id="filterPanel">
+                <div class="filter-header">
+                    <h3>🔍 Filter Messages</h3>
+                </div>
+                <div class="filter-content">
+                    <div class="filter-group">
+                        <div class="filter-group-title">Message Types</div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-user" checked>
+                            <label for="filter-user">👤 User</label>
+                            <span class="filter-count" id="count-user">0</span>
+                        </div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-assistant" checked>
+                            <label for="filter-assistant">🤖 Claude</label>
+                            <span class="filter-count" id="count-assistant">0</span>
+                        </div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-tool">
+                            <label for="filter-tool">🔧 Tool Use</label>
+                            <span class="filter-count" id="count-tool">0</span>
+                        </div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-result">
+                            <label for="filter-result">📋 Tool Result</label>
+                            <span class="filter-count" id="count-result">0</span>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <div class="filter-group-title">Specific Tools</div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-read">
+                            <label for="filter-read">Read</label>
+                            <span class="filter-count" id="count-read">0</span>
+                        </div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-grep">
+                            <label for="filter-grep">Grep</label>
+                            <span class="filter-count" id="count-grep">0</span>
+                        </div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-edit">
+                            <label for="filter-edit">Edit</label>
+                            <span class="filter-count" id="count-edit">0</span>
+                        </div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-bash">
+                            <label for="filter-bash">Bash</label>
+                            <span class="filter-count" id="count-bash">0</span>
+                        </div>
+                        <div class="filter-item">
+                            <input type="checkbox" id="filter-write">
+                            <label for="filter-write">Write</label>
+                            <span class="filter-count" id="count-write">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button class="filter-btn" id="selectAllBtn">Select All</button>
+                    <button class="filter-btn" id="deselectAllBtn">Deselect All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configure marked.js
+        const markedOptions = {
+            breaks: true,
+            gfm: true
+        };
+
+        // Only configure highlight if hljs is available
+        if (typeof hljs !== 'undefined') {
+            markedOptions.highlight = function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (e) {}
+                }
+                return hljs.highlightAuto(code).value;
+            };
+        }
+
+        marked.setOptions(markedOptions);
+
+        let allProjects = [];
+        let currentProject = null;
+        let currentMessages = [];
+        let currentPage = 0;
+        let totalPages = 1;
+        let totalMessages = 0;
+        let isLoading = false;
+        let searchTerm = '';
+        let visibleMessageCount = 0;
+
+        // Filter state
+        const filters = {
+            user: true,
+            assistant: true,
+            tool: false,
+            result: false,
+            read: false,
+            grep: false,
+            edit: false,
+            bash: false,
+            write: false
+        };
+
+        // Message type counts
+        const messageCounts = {
+            user: 0,
+            assistant: 0,
+            tool: 0,
+            result: 0,
+            read: 0,
+            grep: 0,
+            edit: 0,
+            bash: 0,
+            write: 0
+        };
+
+        // Theme selector
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const theme = btn.dataset.theme;
+                document.body.className = `theme-${theme}`;
+                document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                localStorage.setItem('claude-viewer-theme', theme);
+            });
+        });
+
+        // Filter checkboxes
+        document.querySelectorAll('.filter-item input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const filterType = checkbox.id.replace('filter-', '');
+                filters[filterType] = checkbox.checked;
+                renderMessages();
+            });
+        });
+
+        // Select all filters
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            document.querySelectorAll('.filter-item input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+            });
+            Object.keys(filters).forEach(k => filters[k] = true);
+            renderMessages();
+        });
+
+        // Deselect all filters
+        document.getElementById('deselectAllBtn').addEventListener('click', () => {
+            document.querySelectorAll('.filter-item input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+            Object.keys(filters).forEach(k => filters[k] = false);
+            renderMessages();
+        });
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('claude-viewer-theme');
+        if (savedTheme) {
+            document.body.className = `theme-${savedTheme}`;
+            document.querySelectorAll('.theme-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.theme === savedTheme);
+            });
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            searchTerm = e.target.value.toLowerCase();
+            renderProjectList();
+        });
+
+        // Load more button
+        document.getElementById('loadMoreBtn').addEventListener('click', loadMoreMessages);
+
+        // Apply Filters button
+        document.getElementById('refreshFiltersBtn').addEventListener('click', reloadWithFilters);
+
+        // Auto-scroll loading
+        let scrollTimeout;
+        document.getElementById('messagesContainer').addEventListener('scroll', (e) => {
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+
+            scrollTimeout = setTimeout(() => {
+                const container = e.target;
+                const scrollTop = container.scrollTop;
+                const scrollHeight = container.scrollHeight;
+                const clientHeight = container.clientHeight;
+
+                if (scrollHeight - scrollTop - clientHeight < 200 && hasMorePages() && !isLoading) {
+                    loadMoreMessages();
+                }
+            }, 100);
+        });
+
+        async function loadProjects() {
+            try {
+                const response = await fetch('/api/projects');
+                allProjects = await response.json();
+                renderProjectList();
+            } catch (error) {
+                document.getElementById('projectList').innerHTML =
+                    '<div class="project-item">Cannot load projects<br><small>Make sure server is running</small></div>';
+            }
+        }
+
+        function renderProjectList() {
+            const container = document.getElementById('projectList');
+            container.innerHTML = '';
+
+            const filteredProjects = allProjects.filter(p =>
+                (p.displayName || p.id).toLowerCase().includes(searchTerm) ||
+                p.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (filteredProjects.length === 0) {
+                container.innerHTML = '<div class="no-results">No matching projects</div>';
+                return;
+            }
+
+            filteredProjects.forEach(project => {
+                const item = document.createElement('div');
+                item.className = 'project-item';
+                const displayName = project.displayName || project.id;
+                const fileInfo = project.files ? ` · ${project.files} files` : '';
+                item.innerHTML = `
+                    <div class="project-name">${escapeHtml(displayName)}</div>
+                    <div class="project-info">${project.messageCount} msgs (${project.userMessageCount} user)${fileInfo} · ${formatDate(project.startTime)}</div>
+                `;
+                item.addEventListener('click', () => loadProject(project, item));
+                container.appendChild(item);
+            });
+        }
+
+        async function loadProject(project, itemElement) {
+            if (isLoading) return;
+
+            document.querySelectorAll('.project-item').forEach(el => el.classList.remove('active'));
+            itemElement.classList.add('active');
+
+            currentProject = project;
+            currentPage = 0;
+            currentMessages = [];
+            isLoading = true;
+
+            try {
+                const response = await fetch(`/api/project/${encodeURIComponent(project.id)}?page=0&pageSize=100`);
+                const data = await response.json();
+
+                totalMessages = data.info.totalMessages;
+                totalPages = data.info.totalPages;
+                currentMessages = data.messages;
+
+                updateHeader();
+                renderMessages();
+                updateLoadMoreButton(data.hasMore);
+            } catch (error) {
+                console.error('Failed to load project:', error);
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        async function loadMoreMessages() {
+            if (isLoading || !currentProject || !hasMorePages()) return;
+
+            isLoading = true;
+            currentPage++;
+
+            try {
+                const response = await fetch(`/api/project/${encodeURIComponent(currentProject.id)}?page=${currentPage}&pageSize=100`);
+                const data = await response.json();
+
+                currentMessages = currentMessages.concat(data.messages);
+                renderMessages();
+                updateHeader();
+                updateLoadMoreButton(data.hasMore);
+            } catch (error) {
+                console.error('Failed to load more:', error);
+                currentPage--;
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        function hasMorePages() {
+            return currentPage < totalPages - 1;
+        }
+
+        function updateHeader() {
+            document.getElementById('mainHeader').style.display = 'block';
+            const displayName = currentProject.displayName || currentProject.id;
+            document.getElementById('projectTitle').textContent = displayName;
+            document.getElementById('projectMeta').textContent =
+                `${totalMessages} total messages · Loaded ${currentMessages.length}`;
+        }
+
+        function updateLoadMoreButton(hasMore) {
+            const container = document.getElementById('loadMoreContainer');
+            const btn = document.getElementById('loadMoreBtn');
+            const info = document.getElementById('pageInfo');
+
+            container.style.display = 'block';
+
+            if (isLoading) {
+                info.innerHTML = '<span class="loading-spinner"></span>Loading...';
+                btn.style.display = 'none';
+            } else if (hasMore) {
+                info.textContent = `Showing ${visibleMessageCount} of ${currentMessages.length} loaded / ${totalMessages} total`;
+                btn.textContent = 'Scroll down for more';
+                btn.style.display = 'inline-block';
+                btn.disabled = false;
+            } else {
+                info.textContent = `Showing ${visibleMessageCount} of ${currentMessages.length} loaded (all ${totalMessages} total)`;
+                btn.textContent = 'All loaded';
+                btn.style.display = 'inline-block';
+                btn.disabled = true;
+            }
+        }
+
+        function updateDisplayInfo() {
+            const hasMore = hasMorePages();
+            updateLoadMoreButton(hasMore);
+        }
+
+        async function reloadWithFilters() {
+            if (isLoading || !currentProject) return;
+
+            const btn = document.getElementById('refreshFiltersBtn');
+            btn.classList.add('loading');
+            isLoading = true;
+            currentPage = 0;
+            currentMessages = [];
+
+            try {
+                let url = `/api/project/${encodeURIComponent(currentProject.id)}?page=0&pageSize=100`;
+                for (const [key, value] of Object.entries(filters)) {
+                    url += `&filter_${key}=${value}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                totalMessages = data.info.totalMessages;
+                totalPages = data.info.totalPages;
+                currentMessages = data.messages;
+
+                updateHeader();
+                renderMessages();
+                updateLoadMoreButton(data.hasMore);
+            } catch (error) {
+                console.error('Failed to reload with filters:', error);
+            } finally {
+                isLoading = false;
+                btn.classList.remove('loading');
+            }
+        }
+
+        // Format content as markdown
+        function formatContent(content, msgType) {
+            if (!content) return '';
+
+            // For tool_use, format as JSON
+            if (msgType === 'tool_use') {
+                try {
+                    // Check if content is already formatted
+                    if (content.includes('Tool:')) {
+                        const lines = content.split('\n');
+                        const toolName = lines[0].replace('Tool: ', '');
+                        const jsonStr = lines.slice(1).join('\n');
+                        const jsonObj = JSON.parse(jsonStr);
+                        return `<div class="tool-json"><strong>Tool: ${escapeHtml(toolName)}</strong><br><pre>${escapeHtml(JSON.stringify(jsonObj, null, 2))}</pre></div>`;
+                    }
+                } catch (e) {
+                    // Fall through to regular formatting
+                }
+            }
+
+            // For user and assistant messages, render as markdown
+            try {
+                const html = marked.parse(content);
+                return `<div class="markdown-content">${html}</div>`;
+            } catch (e) {
+                return `<div class="markdown-content">${escapeHtml(content)}</div>`;
+            }
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = '';
+
+            Object.keys(messageCounts).forEach(k => messageCounts[k] = 0);
+            visibleMessageCount = 0;
+
+            currentMessages.forEach((msg) => {
+                if (msg.type === 'user') messageCounts.user++;
+                if (msg.type === 'assistant') messageCounts.assistant++;
+                if (msg.type === 'tool_use') {
+                    messageCounts.tool++;
+                    if (msg.toolName === 'Read') messageCounts.read++;
+                    if (msg.toolName === 'Grep') messageCounts.grep++;
+                    if (msg.toolName === 'Edit') messageCounts.edit++;
+                    if (msg.toolName === 'Bash') messageCounts.bash++;
+                    if (msg.toolName === 'Write') messageCounts.write++;
+                }
+                if (msg.type === 'tool_result') messageCounts.result++;
+
+                let show = false;
+                if (msg.type === 'user' && filters.user) show = true;
+                if (msg.type === 'assistant' && filters.assistant) show = true;
+                if (msg.type === 'tool_use') {
+                    if (filters.tool) {
+                        if (msg.toolName === 'Read' && !filters.read) show = false;
+                        else if (msg.toolName === 'Grep' && !filters.grep) show = false;
+                        else if (msg.toolName === 'Edit' && !filters.edit) show = false;
+                        else if (msg.toolName === 'Bash' && !filters.bash) show = false;
+                        else if (msg.toolName === 'Write' && !filters.write) show = false;
+                        else show = true;
+                    }
+                }
+                if (msg.type === 'tool_result' && filters.result) show = true;
+
+                if (!show) return;
+
+                visibleMessageCount++;
+
+                const card = document.createElement('div');
+
+                const roleMap = {
+                    'user': { icon: '👤', name: 'User', class: 'user' },
+                    'assistant': { icon: '🤖', name: 'Claude', class: 'assistant' },
+                    'tool_use': { icon: '🔧', name: msg.toolName || 'Tool', class: 'tool_use' },
+                    'tool_result': { icon: '📋', name: 'Result', class: 'tool_result' }
+                };
+
+                const role = roleMap[msg.type] || { icon: '📄', name: msg.type, class: '' };
+
+                card.className = `message ${role.class}`;
+
+                const formattedContent = formatContent(msg.content, msg.type);
+
+                card.innerHTML = `
+                    <div class="role">
+                        <span>${role.icon} ${role.name}</span>
+                        <span class="message-time">${formatDate(msg.timestamp)}</span>
+                    </div>
+                    <div class="message-content">${formattedContent}</div>
+                `;
+
+                container.appendChild(card);
+
+                // Apply syntax highlighting to code blocks (if hljs is available)
+                if (typeof hljs !== 'undefined') {
+                    card.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                }
+            });
+
+            updateFilterCounts();
+            updateDisplayInfo();
+
+            if (visibleMessageCount === 0 && currentMessages.length > 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p>No messages match your filter criteria</p>
+                        <small style="color: var(--text-muted-dark); margin-top: 10px;">Try adjusting your filters to see more messages</small>
+                    </div>
+                `;
+            }
+        }
+
+        function updateFilterCounts() {
+            document.getElementById('count-user').textContent = messageCounts.user;
+            document.getElementById('count-assistant').textContent = messageCounts.assistant;
+            document.getElementById('count-tool').textContent = messageCounts.tool;
+            document.getElementById('count-result').textContent = messageCounts.result;
+            document.getElementById('count-read').textContent = messageCounts.read;
+            document.getElementById('count-grep').textContent = messageCounts.grep;
+            document.getElementById('count-edit').textContent = messageCounts.edit;
+            document.getElementById('count-bash').textContent = messageCounts.bash;
+            document.getElementById('count-write').textContent = messageCounts.write;
+        }
+
+        function formatDate(date) {
+            if (!date) return '';
+            const d = new Date(date);
+            return d.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        loadProjects();
+    </script>
+</body>
+</html>
